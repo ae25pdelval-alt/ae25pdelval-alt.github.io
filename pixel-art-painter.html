@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pixel art painter</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.1.0/iconfont/tabler-icons.min.css">
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f1efe8;
+    --bg-tertiary: #e8e6dd;
+    --bg-info: #e6f1fb;
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #888780;
+    --text-info: #0c447c;
+    --border-tertiary: rgba(0,0,0,0.15);
+    --border-secondary: rgba(0,0,0,0.3);
+    --border-info: #378ADD;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1f1f1d;
+      --bg-secondary: #2c2c2a;
+      --bg-tertiary: #161615;
+      --bg-info: #042c53;
+      --text-primary: #f1efe8;
+      --text-secondary: #b4b2a9;
+      --text-tertiary: #888780;
+      --text-info: #85b7eb;
+      --border-tertiary: rgba(255,255,255,0.15);
+      --border-secondary: rgba(255,255,255,0.3);
+      --border-info: #378ADD;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 64px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0 0 4px;
+  }
+  p.subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 24px;
+    text-align: center;
+  }
+  .app {
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border-tertiary);
+    padding: 20px;
+    max-width: 800px;
+    width: 100%;
+  }
+  .layout {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  #canvas-wrap {
+    position: relative;
+    display: inline-block;
+    border: 0.5px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    touch-action: none;
+    flex: 0 0 auto;
+  }
+  #ref-img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 480px; height: 480px;
+    object-fit: cover;
+    opacity: 0.35;
+    display: none;
+    pointer-events: none;
+  }
+  #pixel-canvas {
+    display: block;
+    cursor: crosshair;
+    background: repeating-conic-gradient(var(--bg-secondary) 0% 25%, var(--bg-primary) 0% 50%) 0 0/20px 20px;
+  }
+  .controls-col {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  label.field-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 6px;
+  }
+  select, input[type="file"] {
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  button {
+    background: transparent;
+    border: 0.5px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--bg-secondary); }
+  button:active { transform: scale(0.98); }
+  .tool-row { display: flex; gap: 6px; }
+  .tool-btn { flex: 1; }
+  .active-tool {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border-secondary) !important;
+  }
+  input[type="range"] { width: 100px; accent-color: var(--text-info); }
+  input[type="color"] {
+    width: 44px; height: 32px;
+    padding: 2px;
+    cursor: pointer;
+    border: 0.5px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+  }
+  #palette {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+  }
+  #palette button {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 0.5px solid var(--border-tertiary);
+    border-radius: 4px;
+    padding: 0;
+  }
+  #score-card {
+    display: none;
+    margin-top: 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    width: 480px;
+  }
+  #score-bar-track {
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  #score-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--text-info);
+    transition: width 0.4s;
+  }
+  #score-value { font-size: 24px; font-weight: 500; }
+  #score-msg { font-size: 13px; color: var(--text-secondary); margin: 0; }
+  .score-btn {
+    background: var(--bg-info);
+    color: var(--text-info);
+    border-color: var(--border-info);
+  }
+  .opacity-row {
+    display: flex; gap: 8px; align-items: center; margin-top: 8px;
+  }
+  footer {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+</style>
+</head>
+<body>
+
+<h1>Pixel art painter</h1>
+<p class="subtitle">Load a reference image, trace it pixel by pixel, then check your score.</p>
+
+<div class="app">
+  <div class="layout">
+
+    <div style="flex: 0 0 auto;">
+      <div id="canvas-wrap">
+        <img id="ref-img" alt="reference" />
+        <canvas id="pixel-canvas" width="480" height="480"></canvas>
+      </div>
+      <div class="opacity-row">
+        <label class="field-label" style="margin: 0;">Reference opacity</label>
+        <input type="range" id="ref-opacity" min="0" max="100" value="35" step="5" />
+      </div>
+
+      <div id="score-card">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px;">
+          <span style="font-size: 13px; color: var(--text-secondary);">match score</span>
+          <span id="score-value">0%</span>
+        </div>
+        <div id="score-bar-track">
+          <div id="score-bar"></div>
+        </div>
+        <p id="score-msg"></p>
+      </div>
+    </div>
+
+    <div class="controls-col">
+
+      <div>
+        <label class="field-label">Reference image</label>
+        <input type="file" id="file-input" accept="image/*" />
+        <div style="display:flex; gap: 8px; margin-top: 6px;">
+          <button id="trace-mode-btn">Show under canvas</button>
+          <button id="clear-img-btn">Remove image</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="field-label">Grid size</label>
+        <select id="grid-size">
+          <option value="16">16 x 16</option>
+          <option value="24" selected>24 x 24</option>
+          <option value="32">32 x 32</option>
+          <option value="48">48 x 48</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="field-label">Tool</label>
+        <div class="tool-row">
+          <button id="tool-pen" class="tool-btn active-tool"><i class="ti ti-pencil"></i> pen</button>
+          <button id="tool-eraser" class="tool-btn"><i class="ti ti-eraser"></i> erase</button>
+          <button id="tool-fill" class="tool-btn"><i class="ti ti-paint"></i> fill</button>
+          <button id="tool-pick" class="tool-btn"><i class="ti ti-color-picker"></i></button>
+        </div>
+      </div>
+
+      <div>
+        <label class="field-label">Color</label>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <input type="color" id="color-picker" value="#D85A30" />
+          <div id="current-swatch" style="width: 32px; height: 32px; border-radius: var(--radius-md); border: 0.5px solid var(--border-secondary); background: #D85A30;"></div>
+        </div>
+        <div id="palette"></div>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button id="undo-btn" style="flex: 1;"><i class="ti ti-arrow-back-up"></i> undo</button>
+        <button id="clear-btn" style="flex: 1;"><i class="ti ti-trash"></i> clear</button>
+      </div>
+
+      <button id="score-btn" class="score-btn"><i class="ti ti-chart-bar"></i> check my work</button>
+      <button id="download-btn"><i class="ti ti-download"></i> download pixel art</button>
+
+    </div>
+  </div>
+</div>
+
+<footer>Works fully offline in the browser. No data is uploaded anywhere.</footer>
+
+<script>
+(function() {
+  var canvas = document.getElementById('pixel-canvas');
+  var ctx = canvas.getContext('2d');
+  var refImg = document.getElementById('ref-img');
+  var canvasWrap = document.getElementById('canvas-wrap');
+  var W = canvas.width, H = canvas.height;
+
+  var gridN = 24;
+  var cellSize = W / gridN;
+  var grid = [];
+  var history = [];
+  var tool = 'pen';
+  var currentColor = '#D85A30';
+  var painting = false;
+  var traceUnder = true;
+
+  var palette = [
+    '#000000','#FFFFFF','#888780','#D3D1C7',
+    '#D85A30','#F0997B','#1D9E75','#9FE1CB',
+    '#378ADD','#85B7EB','#BA7517','#FAC775',
+    '#E24B4A','#F09595','#7F77DD','#AFA9EC',
+    '#D4537E','#ED93B1','#412402','#2C2C2A',
+    '#FAEEDA','#E1F5EE'
+  ];
+
+  function initGrid(n) {
+    gridN = n;
+    cellSize = W / gridN;
+    grid = new Array(n * n).fill(null);
+    history = [];
+    hideScore();
+    render();
+  }
+
+  function idx(x, y) { return y * gridN + x; }
+
+  function pushHistory() {
+    history.push(grid.slice());
+    if (history.length > 60) history.shift();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    for (var y = 0; y < gridN; y++) {
+      for (var x = 0; x < gridN; x++) {
+        var c = grid[idx(x, y)];
+        if (c) {
+          ctx.fillStyle = c;
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+    if (gridN <= 48) {
+      ctx.strokeStyle = 'rgba(128,128,128,0.25)';
+      ctx.lineWidth = 1;
+      for (var i = 0; i <= gridN; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, H);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(W, i * cellSize);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function floodFill(x, y, targetColor, fillColor) {
+    if (targetColor === fillColor) return;
+    var stack = [[x, y]];
+    var visited = {};
+    while (stack.length) {
+      var p = stack.pop();
+      var px = p[0], py = p[1];
+      if (px < 0 || py < 0 || px >= gridN || py >= gridN) continue;
+      var key = px + ',' + py;
+      if (visited[key]) continue;
+      visited[key] = true;
+      var i = idx(px, py);
+      if (grid[i] !== targetColor) continue;
+      grid[i] = fillColor;
+      stack.push([px+1, py]);
+      stack.push([px-1, py]);
+      stack.push([px, py+1]);
+      stack.push([px, py-1]);
+    }
+  }
+
+  function paintCell(x, y) {
+    if (x < 0 || y < 0 || x >= gridN || y >= gridN) return;
+    var i = idx(x, y);
+    if (tool === 'pen') {
+      if (grid[i] === currentColor) return;
+      grid[i] = currentColor;
+      render();
+    } else if (tool === 'eraser') {
+      if (grid[i] === null) return;
+      grid[i] = null;
+      render();
+    } else if (tool === 'fill') {
+      floodFill(x, y, grid[i], currentColor);
+      render();
+    } else if (tool === 'pick') {
+      if (grid[i]) {
+        currentColor = grid[i];
+        document.getElementById('color-picker').value = currentColor;
+        document.getElementById('current-swatch').style.background = currentColor;
+        setTool('pen');
+      }
+    }
+  }
+
+  function getCellFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    var x = Math.floor((clientX - rect.left) / rect.width * gridN);
+    var y = Math.floor((clientY - rect.top) / rect.height * gridN);
+    return [x, y];
+  }
+
+  function startPaint(e) {
+    e.preventDefault();
+    painting = true;
+    pushHistory();
+    var c = getCellFromEvent(e);
+    paintCell(c[0], c[1]);
+  }
+  function movePaint(e) {
+    if (!painting) return;
+    e.preventDefault();
+    if (tool === 'fill' || tool === 'pick') return;
+    var c = getCellFromEvent(e);
+    paintCell(c[0], c[1]);
+  }
+  function endPaint() { painting = false; }
+
+  canvas.addEventListener('mousedown', startPaint);
+  canvas.addEventListener('mousemove', movePaint);
+  window.addEventListener('mouseup', endPaint);
+  canvas.addEventListener('touchstart', startPaint, {passive: false});
+  canvas.addEventListener('touchmove', movePaint, {passive: false});
+  canvas.addEventListener('touchend', endPaint);
+
+  function setTool(t) {
+    tool = t;
+    document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active-tool'); });
+    document.getElementById('tool-' + t).classList.add('active-tool');
+  }
+
+  document.getElementById('tool-pen').addEventListener('click', function() { setTool('pen'); });
+  document.getElementById('tool-eraser').addEventListener('click', function() { setTool('eraser'); });
+  document.getElementById('tool-fill').addEventListener('click', function() { setTool('fill'); });
+  document.getElementById('tool-pick').addEventListener('click', function() { setTool('pick'); });
+
+  document.getElementById('color-picker').addEventListener('input', function(e) {
+    currentColor = e.target.value;
+    document.getElementById('current-swatch').style.background = currentColor;
+  });
+
+  var paletteEl = document.getElementById('palette');
+  palette.forEach(function(c) {
+    var sw = document.createElement('button');
+    sw.style.background = c;
+    sw.addEventListener('click', function() {
+      currentColor = c;
+      document.getElementById('color-picker').value = c;
+      document.getElementById('current-swatch').style.background = c;
+    });
+    paletteEl.appendChild(sw);
+  });
+
+  document.getElementById('grid-size').addEventListener('change', function(e) {
+    initGrid(parseInt(e.target.value, 10));
+  });
+
+  document.getElementById('undo-btn').addEventListener('click', function() {
+    if (history.length) {
+      grid = history.pop();
+      render();
+    }
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', function() {
+    pushHistory();
+    grid = new Array(gridN * gridN).fill(null);
+    render();
+    hideScore();
+  });
+
+  document.getElementById('file-input').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      refImg.src = ev.target.result;
+      refImg.style.display = 'block';
+      hideScore();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('clear-img-btn').addEventListener('click', function() {
+    refImg.src = '';
+    refImg.style.display = 'none';
+    document.getElementById('file-input').value = '';
+    hideScore();
+  });
+
+  document.getElementById('trace-mode-btn').addEventListener('click', function() {
+    traceUnder = !traceUnder;
+    canvasWrap.style.flexDirection = traceUnder ? 'column' : 'column-reverse';
+    this.textContent = traceUnder ? 'Show under canvas' : 'Show over canvas (faint)';
+  });
+
+  document.getElementById('ref-opacity').addEventListener('input', function(e) {
+    refImg.style.opacity = e.target.value / 100;
+  });
+
+  document.getElementById('download-btn').addEventListener('click', function() {
+    var exportCanvas = document.createElement('canvas');
+    exportCanvas.width = gridN;
+    exportCanvas.height = gridN;
+    var ectx = exportCanvas.getContext('2d');
+    for (var y = 0; y < gridN; y++) {
+      for (var x = 0; x < gridN; x++) {
+        var c = grid[idx(x, y)];
+        if (c) {
+          ectx.fillStyle = c;
+          ectx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+    var link = document.createElement('a');
+    link.download = 'pixel-art.png';
+    link.href = exportCanvas.toDataURL('image/png');
+    link.click();
+  });
+
+  function hideScore() {
+    document.getElementById('score-card').style.display = 'none';
+  }
+
+  function hexToRgb(hex) {
+    var v = parseInt(hex.slice(1), 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+
+  document.getElementById('score-btn').addEventListener('click', function() {
+    if (!refImg.src || refImg.style.display === 'none') {
+      var sc = document.getElementById('score-card');
+      sc.style.display = 'block';
+      document.getElementById('score-value').textContent = '--';
+      document.getElementById('score-bar').style.width = '0%';
+      document.getElementById('score-msg').textContent = 'Upload a reference image first so there is something to compare against.';
+      return;
+    }
+
+    var tmp = document.createElement('canvas');
+    tmp.width = gridN;
+    tmp.height = gridN;
+    var tctx = tmp.getContext('2d');
+
+    var natW = refImg.naturalWidth, natH = refImg.naturalHeight;
+    var side = Math.min(natW, natH);
+    var sx = (natW - side) / 2, sy = (natH - side) / 2;
+    tctx.drawImage(refImg, sx, sy, side, side, 0, 0, gridN, gridN);
+    var refData = tctx.getImageData(0, 0, gridN, gridN).data;
+
+    var totalCells = gridN * gridN;
+    var paintedCells = 0;
+    var sumDist = 0;
+    var maxDist = Math.sqrt(255*255*3);
+
+    for (var y = 0; y < gridN; y++) {
+      for (var x = 0; x < gridN; x++) {
+        var i = idx(x, y);
+        var pi = (y * gridN + x) * 4;
+        var rr = refData[pi], rg = refData[pi+1], rb = refData[pi+2];
+        var cell = grid[i];
+        if (cell) {
+          paintedCells++;
+          var rgb = hexToRgb(cell);
+          var dr = rgb[0]-rr, dg = rgb[1]-rg, db = rgb[2]-rb;
+          var dist = Math.sqrt(dr*dr + dg*dg + db*db);
+          sumDist += dist;
+        } else {
+          sumDist += maxDist * 0.6;
+        }
+      }
+    }
+
+    var avgDist = sumDist / totalCells;
+    var colorScore = Math.max(0, 1 - avgDist / maxDist);
+    var coverage = paintedCells / totalCells;
+    var finalScore = Math.round((colorScore * 0.75 + coverage * 0.25) * 100);
+    finalScore = Math.max(0, Math.min(100, finalScore));
+
+    var msg;
+    if (finalScore >= 90) msg = "Excellent! That's a remarkably close recreation.";
+    else if (finalScore >= 75) msg = "Great work, the colors and shapes line up well.";
+    else if (finalScore >= 55) msg = "Solid attempt. Try adjusting colors in patchy areas for a closer match.";
+    else if (finalScore >= 35) msg = "Getting there. Try increasing the reference opacity to trace shapes more closely.";
+    else msg = "Just getting started, or the grid is mostly empty. Paint more cells and check again.";
+
+    var sc = document.getElementById('score-card');
+    sc.style.display = 'block';
+    document.getElementById('score-value').textContent = finalScore + '%';
+    document.getElementById('score-bar').style.width = finalScore + '%';
+    document.getElementById('score-msg').textContent = msg;
+  });
+
+  initGrid(24);
+})();
+</script>
+</body>
+</html>
